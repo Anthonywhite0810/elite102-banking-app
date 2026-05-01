@@ -1,1 +1,188 @@
+import sqlite3
 
+# ==========================================
+# STEP 1: DATABASE SETUP
+# ==========================================
+def setup_database():
+    """Creates the database and the 'accounts' table if they don't exist yet."""
+    conn = sqlite3.connect("my_bank.db") 
+    cursor = conn.cursor()
+    
+    # We need a table to store our users and their money!
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS accounts (
+            account_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            balance REAL NOT NULL
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# ==========================================
+# STEP 2: BANKING FUNCTIONS
+# ==========================================
+def create_account():
+    """Creates a new user account with a name and starting balance."""
+    print("\nAwesome! Let's get a new account set up.")
+    name = input("What is the account holder's name? ")
+    
+    try:
+        initial_deposit = float(input(f"How much is {name} depositing today? $"))
+    except ValueError:
+        print("Oops! Please enter a valid number.")
+        return
+
+    conn = sqlite3.connect("my_bank.db")
+    cursor = conn.cursor()
+    
+    # INSERT the new user into our database
+    cursor.execute("INSERT INTO accounts (name, balance) VALUES (?, ?)", (name, initial_deposit))
+    conn.commit()
+    conn.close()
+    
+    print(f"✅ Success! Account created for {name} with a balance of ${initial_deposit:.2f}.")
+
+def view_accounts():
+    """Shows a list of all accounts in the bank."""
+    conn = sqlite3.connect("my_bank.db")
+    cursor = conn.cursor()
+    
+    # SELECT everything from the accounts table
+    cursor.execute("SELECT account_id, name, balance FROM accounts")
+    accounts = cursor.fetchall()
+    conn.close()
+
+    print("\n--- 🏦 Bank Accounts Directory ---")
+    if not accounts:
+        print("No accounts found. It's quiet in here... maybe create one?")
+    else:
+        for acc in accounts:
+            # acc[0] is ID, acc[1] is name, acc[2] is balance
+            print(f"ID: {acc[0]} | Name: {acc[1]} | Balance: ${acc[2]:.2f}")
+    print("--------------------------------")
+
+def check_balance():
+    """Looks up a specific account's balance using their ID."""
+    try:
+        acc_id = int(input("\nEnter the Account ID to check balance: "))
+    except ValueError:
+        print("Oops! Please enter a valid ID number.")
+        return
+
+    conn = sqlite3.connect("my_bank.db")
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT name, balance FROM accounts WHERE account_id = ?", (acc_id,))
+    account = cursor.fetchone() # Fetch just one record
+    conn.close()
+
+    if account:
+        print(f"💰 {account[0]}'s current balance is: ${account[1]:.2f}")
+    else:
+        print("❌ Hmm, we couldn't find an account with that ID.")
+
+def deposit_money():
+    """Adds money to an existing account."""
+    try:
+        acc_id = int(input("\nEnter the Account ID for the deposit: "))
+        amount = float(input("How much are we depositing? $"))
+    except ValueError:
+        print("Oops! Please enter valid numbers.")
+        return
+
+    if amount <= 0:
+        print("Please enter an amount greater than zero.")
+        return
+
+    conn = sqlite3.connect("my_bank.db")
+    cursor = conn.cursor()
+    
+    # First, let's make sure the account exists
+    cursor.execute("SELECT balance FROM accounts WHERE account_id = ?", (acc_id,))
+    account = cursor.fetchone()
+
+    if account:
+        new_balance = account[0] + amount
+        # UPDATE the balance in the database
+        cursor.execute("UPDATE accounts SET balance = ? WHERE account_id = ?", (new_balance, acc_id))
+        conn.commit()
+        print(f"✅ Deposit successful! The new balance is ${new_balance:.2f}.")
+    else:
+        print("❌ Account not found.")
+        
+    conn.close()
+
+def withdraw_money():
+    """Takes money out of an account, but ONLY if they have enough!"""
+    try:
+        acc_id = int(input("\nEnter the Account ID for the withdrawal: "))
+        amount = float(input("How much would you like to withdraw? $"))
+    except ValueError:
+        print("Oops! Please enter valid numbers.")
+        return
+
+    conn = sqlite3.connect("my_bank.db")
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT balance FROM accounts WHERE account_id = ?", (acc_id,))
+    account = cursor.fetchone()
+
+    if account:
+        current_balance = account[0]
+        
+        # BALANCE VALIDATION (Requirement from your list!)
+        if amount > current_balance:
+            print(f"🚫 Insufficient funds! You only have ${current_balance:.2f} available.")
+        elif amount <= 0:
+            print("Please enter a valid amount to withdraw.")
+        else:
+            new_balance = current_balance - amount
+            cursor.execute("UPDATE accounts SET balance = ? WHERE account_id = ?", (new_balance, acc_id))
+            conn.commit()
+            print(f"💵 Here is your ${amount:.2f}. Your remaining balance is ${new_balance:.2f}.")
+    else:
+        print("❌ Account not found.")
+        
+    conn.close()
+
+# ==========================================
+# STEP 3: THE MENU UI (User Interface)
+# ==========================================
+def main_menu():
+    """The main loop that keeps the app running and handles user choices."""
+    setup_database() # Make sure the DB is ready before we start
+    
+    print("\n👋 Welcome to the Elite 102 Banking System!")
+    
+    while True:
+        print("\nWhat would you like to do today?")
+        print("1. 📝 Create a new account")
+        print("2. 💵 Deposit money")
+        print("3. 🏧 Withdraw money")
+        print("4. 🔍 Check account balance")
+        print("5. 📋 List all accounts")
+        print("6. 🚪 Exit")
+        
+        choice = input("Enter a number (1-6): ")
+        
+        if choice == '1':
+            create_account()
+        elif choice == '2':
+            deposit_money()
+        elif choice == '3':
+            withdraw_money()
+        elif choice == '4':
+            check_balance()
+        elif choice == '5':
+            view_accounts()
+        elif choice == '6':
+            print("Thanks for banking with us. Have a great day! 👋")
+            break # Breaks out of the while loop, ending the program
+        else:
+            print("I didn't quite catch that. Please enter a number between 1 and 6.")
+
+# This tells Python to run the main_menu function when you start the file
+if __name__ == "__main__":
+    main_menu()
